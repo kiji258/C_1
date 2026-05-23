@@ -227,38 +227,40 @@ function advanceMutualTurn(answeredTeamId) {
 
 function handleMutualAnswer(playerId, playerName, selectedIndex) {
     const mutual = gameState.mutual;
-    // 如果不在答题状态，或者不是当前答题队伍，拒绝但返回 false（前端不会收到错误横幅，但状态会保留，主持人可跳过）
     if (!mutual.roundActive || mutual.answeringPlayerId !== playerId) {
         return false;
     }
 
-    // 无论是否超时，都处理此答案（超时视为错误答案，不得分）
+    // 先保存当前题目信息，防止后续清空导致无法引用
+    const question = mutual.currentQuestion;
+    if (!question) return false;   // 安全兜底
+
     const isTimeout = Date.now() > mutual.answerEndTime;
     clearMutualTimer();
 
-    const isCorrect = isTimeout ? false : (selectedIndex === mutual.currentQuestion.answer);
+    const isCorrect = isTimeout ? false : (selectedIndex === question.answer);
     const player = gameState.players.find(p => p.id === playerId);
     let scoreDelta = 0;
     if (isCorrect) { scoreDelta = gameState.correctPoints; player.score += scoreDelta; }
 
-    // 记录历史
+    // 记录历史（使用已保存的 question）
     if (isTimeout) {
-        addHistoryRecord('mutual', playerId, player.name, playerName || '?', mutual.currentQuestion, '超时未答', false, 0);
+        addHistoryRecord('mutual', playerId, player.name, playerName || '?', question, '超时未答', false, 0);
     } else {
-        addHistoryRecord('mutual', playerId, player.name, playerName, mutual.currentQuestion,
-            mutual.currentQuestion.options[selectedIndex], isCorrect, scoreDelta);
+        addHistoryRecord('mutual', playerId, player.name, playerName, question,
+            question.options[selectedIndex], isCorrect, scoreDelta);
     }
 
     mutual.teamAnswerCount[playerId]++;
     mutual.roundActive = false;
-    mutual.currentQuestion = null;
+    mutual.currentQuestion = null;   // 现在可以安全清空
 
-    // 生成结果消息
+    // 生成消息（此时 question 仍可用）
     const message = isTimeout
         ? `⏰ ${player.name} 答题超时，不得分`
         : (isCorrect
             ? `✅ ${player.name} 正确！+${scoreDelta}分`
-            : `❌ ${player.name} 回答错误！正确答案是 ${mutual.currentQuestion.options[mutual.currentQuestion.answer]}`);
+            : `❌ ${player.name} 回答错误！正确答案是 ${question.options[question.answer]}`);
 
     gameState.lastAnswerResult = {
         teamId: playerId,
@@ -272,7 +274,6 @@ function handleMutualAnswer(playerId, playerName, selectedIndex) {
     advanceMutualTurn(playerId);
     broadcastState();
 
-    // 4秒后清除结果横幅
     setTimeout(() => {
         if (gameState.lastAnswerResult?.teamId === playerId) {
             gameState.lastAnswerResult = null;
