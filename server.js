@@ -98,29 +98,15 @@ function broadcastState() {
     if (gameState.mutual.roundActive) {
         mutualRemainingSec = Math.ceil(Math.max(0, gameState.mutual.answerEndTime - now) / 1000);
     }
-    const stateToSend = {
-        ...gameState,
-        activeTeams: getActiveTeams().map(t => t.id),
-        teamMembers,
-        rushRemainingSec,
-        mutualRemainingSec,
-    };
-    stateToSend.rush.rushTimer = null;
-    stateToSend.rush.answerTimer = null;
-    stateToSend.mutual.answerTimer = null;
-    delete stateToSend.rush.rushEndTime;
-    delete stateToSend.rush.answerEndTime;
-    delete stateToSend.mutual.answerEndTime;
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify({ type: 'STATE', state: stateToSend }));
-    });
+    const stateToSend = { ...gameState, activeTeams: getActiveTeams().map(t => t.id), teamMembers, rushRemainingSec, mutualRemainingSec };
+    stateToSend.rush.rushTimer = null; stateToSend.rush.answerTimer = null; stateToSend.mutual.answerTimer = null;
+    wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(JSON.stringify({ type: 'STATE', state: stateToSend })); });
 }
 
 function clearRushTimers() {
     if (gameState.rush.rushTimer) clearTimeout(gameState.rush.rushTimer);
     if (gameState.rush.answerTimer) clearTimeout(gameState.rush.answerTimer);
-    gameState.rush.rushTimer = null;
-    gameState.rush.answerTimer = null;
+    gameState.rush.rushTimer = null; gameState.rush.answerTimer = null;
 }
 function clearMutualTimer() {
     if (gameState.mutual.answerTimer) clearTimeout(gameState.mutual.answerTimer);
@@ -131,8 +117,7 @@ function getRandomQuestion(pool, usedIds, setExhausted = false) {
     let available = pool.filter(q => !usedIds.includes(q.id));
     if (available.length === 0) {
         if (setExhausted) return null;
-        usedIds.length = 0;
-        available = [...pool];
+        usedIds.length = 0; available = [...pool];
     }
     const q = available[Math.floor(Math.random() * available.length)];
     usedIds.push(q.id);
@@ -157,19 +142,9 @@ function startRushTimeout() {
     gameState.rush.rushTimer = setTimeout(() => {
         if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'RUSHING') {
             gameState.rush.roundState = 'FINISHED';
-            gameState.lastAnswerResult = {
-                teamId: null, teamName: '系统',
-                message: '⏰ 无人抢答，此题跳过',
-                timestamp: Date.now()
-            };
+            gameState.lastAnswerResult = { teamId: null, teamName: '系统', message: '⏰ 无人抢答，此题跳过', timestamp: Date.now() };
             broadcastState();
-            setTimeout(() => {
-                if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') {
-                    gameState.rush.roundState = 'IDLE';
-                    gameState.lastAnswerResult = null;
-                    broadcastState();
-                }
-            }, 3000);
+            setTimeout(() => { if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') { gameState.rush.roundState = 'IDLE'; gameState.lastAnswerResult = null; broadcastState(); } }, 3000);
         }
     }, 40000);
 }
@@ -181,21 +156,9 @@ function startAnswerTimeout() {
             const p = gameState.players.find(p => p.id === gameState.rush.buzzerPlayerId);
             if (p) {
                 gameState.rush.roundState = 'FINISHED';
-                gameState.lastAnswerResult = {
-                    teamId: p.id, teamName: p.name,
-                    playerName: gameState.rush.buzzerPlayerName,
-                    isCorrect: false,
-                    message: `⏰ ${p.name} 答题超时，不得分`,
-                    timestamp: Date.now()
-                };
+                gameState.lastAnswerResult = { teamId: p.id, teamName: p.name, playerName: gameState.rush.buzzerPlayerName, isCorrect: false, message: `⏰ ${p.name} 答题超时，不得分`, timestamp: Date.now() };
                 broadcastState();
-                setTimeout(() => {
-                    if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') {
-                        gameState.rush.roundState = 'IDLE';
-                        gameState.lastAnswerResult = null;
-                        broadcastState();
-                    }
-                }, 2000);
+                setTimeout(() => { if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') { gameState.rush.roundState = 'IDLE'; gameState.lastAnswerResult = null; broadcastState(); } }, 2000);
             }
         }
     }, 6000);
@@ -207,13 +170,7 @@ function skipCurrentRush() {
     gameState.rush.roundState = 'FINISHED';
     gameState.lastAnswerResult = { teamId: null, teamName: '主持人', message: '⏭ 主持人跳过本题', timestamp: Date.now() };
     broadcastState();
-    setTimeout(() => {
-        if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') {
-            gameState.rush.roundState = 'IDLE';
-            gameState.lastAnswerResult = null;
-            broadcastState();
-        }
-    }, 2000);
+    setTimeout(() => { if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') { gameState.rush.roundState = 'IDLE'; gameState.lastAnswerResult = null; broadcastState(); } }, 2000);
 }
 
 function handleRushAnswer(playerId, playerName, selectedIndex) {
@@ -226,20 +183,9 @@ function handleRushAnswer(playerId, playerName, selectedIndex) {
     if (isCorrect) { scoreDelta = gameState.correctPoints; player.score += scoreDelta; }
     addHistoryRecord('rush', playerId, player.name, playerName, rush.currentQuestion, rush.currentQuestion.options[selectedIndex], isCorrect, scoreDelta);
     rush.roundState = 'FINISHED';
-    gameState.lastAnswerResult = {
-        teamId: playerId, teamName: player.name, playerName,
-        isCorrect,
-        message: isCorrect ? `✅ ${player.name} 正确！+${scoreDelta}分` : `❌ ${player.name} 错误！正确答案是 ${rush.currentQuestion.options[rush.correctAnswer]}`,
-        timestamp: Date.now(),
-    };
+    gameState.lastAnswerResult = { teamId: playerId, teamName: player.name, playerName, isCorrect, message: isCorrect ? `✅ ${player.name} 正确！+${scoreDelta}分` : `❌ ${player.name} 错误！正确答案是 ${rush.currentQuestion.options[rush.correctAnswer]}`, timestamp: Date.now() };
     broadcastState();
-    setTimeout(() => {
-        if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') {
-            gameState.rush.roundState = 'IDLE';
-            gameState.lastAnswerResult = null;
-            broadcastState();
-        }
-    }, 4000);
+    setTimeout(() => { if (gameState.currentActivity === 'rush' && gameState.rush.roundState === 'FINISHED') { gameState.rush.roundState = 'IDLE'; gameState.lastAnswerResult = null; broadcastState(); } }, 4000);
     return { correct: isCorrect, msg: gameState.lastAnswerResult.message };
 }
 
@@ -252,19 +198,10 @@ function startMutualAnswerTimeout() {
             if (player) {
                 gameState.mutual.roundActive = false;
                 gameState.mutual.teamAnswerCount[pId]++;
-                gameState.lastAnswerResult = {
-                    teamId: pId, teamName: player.name,
-                    playerName: gameState.mutual.answeringPlayerName,
-                    isCorrect: false,
-                    message: `⏰ ${player.name} 答题超时，不得分`,
-                    timestamp: Date.now()
-                };
+                gameState.lastAnswerResult = { teamId: pId, teamName: player.name, playerName: gameState.mutual.answeringPlayerName, isCorrect: false, message: `⏰ ${player.name} 答题超时，不得分`, timestamp: Date.now() };
                 advanceMutualTurn(pId);
                 broadcastState();
-                setTimeout(() => {
-                    if (gameState.lastAnswerResult?.teamId === pId) gameState.lastAnswerResult = null;
-                    broadcastState();
-                }, 4000);
+                setTimeout(() => { if (gameState.lastAnswerResult?.teamId === pId) gameState.lastAnswerResult = null; broadcastState(); }, 4000);
             }
         }
     }, 40000);
@@ -308,39 +245,26 @@ function handleMutualAnswer(playerId, playerName, selectedIndex) {
     };
     advanceMutualTurn(playerId);
     broadcastState();
-    setTimeout(() => {
-        if (gameState.lastAnswerResult?.teamId === playerId) gameState.lastAnswerResult = null;
-        broadcastState();
-    }, 4000);
+    setTimeout(() => { if (gameState.lastAnswerResult?.teamId === playerId) gameState.lastAnswerResult = null; broadcastState(); }, 4000);
     return { correct: isCorrect, msg: gameState.lastAnswerResult.message };
 }
 
-// HTTP API
+// HTTP API (unchanged but included for completeness)
 app.get('/api/rush-questions', (req, res) => res.json(RUSH_QUESTIONS));
 app.get('/api/mutual-questions', (req, res) => res.json(MUTUAL_QUESTIONS));
 app.get('/api/history', (req, res) => res.json(answerHistory));
 app.get('/api/team-members', (req, res) => res.json(teamMembers));
-app.get('/api/scores', (req, res) => {
-    const scores = gameState.players.map(p => ({
-        id: p.id, name: p.name, emoji: p.emoji, score: p.score,
-        members: teamMembers[p.id] || []
-    }));
-    res.json(scores);
-});
+app.get('/api/scores', (req, res) => res.json(gameState.players.map(p => ({ id: p.id, name: p.name, emoji: p.emoji, score: p.score, members: teamMembers[p.id] || [] }))));
 app.post('/api/team-members/:teamId', (req, res) => {
-    const teamId = parseInt(req.params.teamId);
-    const { playerName } = req.body;
+    const teamId = parseInt(req.params.teamId); const { playerName } = req.body;
     if (!teamMembers[teamId]) teamMembers[teamId] = [];
     if (playerName && !teamMembers[teamId].includes(playerName)) teamMembers[teamId].push(playerName);
-    broadcastState();
-    res.json({ success: true });
+    broadcastState(); res.json({ success: true });
 });
 app.delete('/api/team-members/:teamId', (req, res) => {
-    const teamId = parseInt(req.params.teamId);
-    const { playerName } = req.body;
+    const teamId = parseInt(req.params.teamId); const { playerName } = req.body;
     if (teamMembers[teamId]) teamMembers[teamId] = teamMembers[teamId].filter(n => n !== playerName);
-    broadcastState();
-    res.json({ success: true });
+    broadcastState(); res.json({ success: true });
 });
 app.post('/api/rush-questions', (req, res) => { const q = req.body; q.id = 'r' + Date.now(); RUSH_QUESTIONS.push(q); res.json({ success: true }); });
 app.put('/api/rush-questions/:id', (req, res) => { const id = req.params.id; const i = RUSH_QUESTIONS.findIndex(q => q.id === id); if (i !== -1) { RUSH_QUESTIONS[i] = { ...req.body, id }; res.json({ success: true }); } else res.status(404).json({ error: 'not found' }); });
@@ -378,9 +302,7 @@ wss.on('connection', (ws) => {
                             gameState.mutual = { currentDrawTeamId: 0, currentAnswerTeamId: 1, currentQuestion: null, answerEndTime: 0, answeringPlayerId: null, answeringPlayerName: null, roundActive: false, teamAnswerCount: new Array(PRESET_TEAMS.length).fill(0), phaseEnded: true, usedQuestionIds: [], answerTimer: null };
                         }
                     }
-                    gameState.lastBuzzWinner = null;
-                    gameState.lastAnswerResult = null;
-                    gameState.activityEnded = false;
+                    gameState.lastBuzzWinner = null; gameState.lastAnswerResult = null; gameState.activityEnded = false;
                     broadcastState();
                 } else if (action === 'startRush') {
                     if (gameState.currentActivity !== 'rush') return;
@@ -388,22 +310,15 @@ wss.on('connection', (ws) => {
                     clearRushTimers();
                     const q = getRandomQuestion(RUSH_QUESTIONS, gameState.rush.usedQuestionIds, true);
                     if (!q) { gameState.rush.questionsExhausted = true; broadcastState(); return; }
-                    gameState.rush.currentQuestion = q;
-                    gameState.rush.correctAnswer = q.answer;
-                    gameState.rush.roundState = 'RUSHING';
-                    gameState.rush.rushEndTime = Date.now() + 40000;
-                    gameState.rush.buzzerPlayerId = null;
-                    gameState.rush.buzzerPlayerName = null;
-                    gameState.lastBuzzWinner = null;
-                    gameState.lastAnswerResult = null;
-                    startRushTimeout();
-                    broadcastState();
+                    gameState.rush.currentQuestion = q; gameState.rush.correctAnswer = q.answer;
+                    gameState.rush.roundState = 'RUSHING'; gameState.rush.rushEndTime = Date.now() + 40000;
+                    gameState.rush.buzzerPlayerId = null; gameState.rush.buzzerPlayerName = null;
+                    gameState.lastBuzzWinner = null; gameState.lastAnswerResult = null;
+                    startRushTimeout(); broadcastState();
                 } else if (action === 'skipRush') {
                     if (gameState.currentActivity === 'rush' && (gameState.rush.roundState === 'RUSHING' || gameState.rush.roundState === 'ANSWERING')) skipCurrentRush();
                 } else if (action === 'endActivity') {
-                    gameState.activityEnded = true;
-                    clearRushTimers(); clearMutualTimer();
-                    broadcastState();
+                    gameState.activityEnded = true; clearRushTimers(); clearMutualTimer(); broadcastState();
                 } else if (action === 'drawQuestion') {
                     if (gameState.currentActivity !== 'mutual' || gameState.mutual.roundActive || gameState.mutual.phaseEnded) return;
                     if (payload.drawTeamId !== gameState.mutual.currentDrawTeamId) return;
@@ -411,38 +326,30 @@ wss.on('connection', (ws) => {
                     clearMutualTimer();
                     const q = getRandomQuestion(MUTUAL_QUESTIONS, gameState.mutual.usedQuestionIds);
                     if (!q) return;
-                    gameState.mutual.currentQuestion = q;
-                    gameState.mutual.roundActive = true;
+                    gameState.mutual.currentQuestion = q; gameState.mutual.roundActive = true;
                     gameState.mutual.answeringPlayerId = gameState.mutual.currentAnswerTeamId;
                     gameState.mutual.answeringPlayerName = null;
                     gameState.mutual.answerEndTime = Date.now() + 40000;
                     gameState.lastAnswerResult = null;
-                    startMutualAnswerTimeout();
-                    broadcastState();
+                    startMutualAnswerTimeout(); broadcastState();
                 }
             } else if (data.type === 'PLAYER_RUSH') {
                 const rush = gameState.rush;
                 if (gameState.currentActivity !== 'rush' || rush.roundState !== 'RUSHING' || rush.buzzerPlayerId !== null || Date.now() > rush.rushEndTime) return;
                 clearRushTimers();
-                rush.buzzerPlayerId = data.playerId;
-                rush.buzzerPlayerName = data.playerName;
+                rush.buzzerPlayerId = data.playerId; rush.buzzerPlayerName = data.playerName;
                 const player = gameState.players.find(p => p.id === data.playerId);
                 gameState.lastBuzzWinner = { teamId: player.id, teamName: player.name, playerName: data.playerName, timestamp: Date.now() };
-                rush.roundState = 'ANSWERING';
-                rush.answerEndTime = Date.now() + 6000;
-                startAnswerTimeout();
-                broadcastState();
-                setTimeout(() => {
-                    if (gameState.lastBuzzWinner?.teamId === player.id) gameState.lastBuzzWinner = null;
-                    broadcastState();
-                }, 4000);
+                rush.roundState = 'ANSWERING'; rush.answerEndTime = Date.now() + 6000;
+                startAnswerTimeout(); broadcastState();
+                setTimeout(() => { if (gameState.lastBuzzWinner?.teamId === player.id) gameState.lastBuzzWinner = null; broadcastState(); }, 4000);
             } else if (data.type === 'PLAYER_ANSWER') {
                 let result;
                 if (gameState.currentActivity === 'rush') result = handleRushAnswer(data.playerId, data.playerName, data.answerIndex);
                 else result = handleMutualAnswer(data.playerId, data.playerName, data.answerIndex);
                 if (result) ws.send(JSON.stringify({ type: 'ANSWER_RESULT', result }));
             }
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     });
 });
 
